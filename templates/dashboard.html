@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12 text-center mb-4">
+        <h2>Data Analysis Dashboard</h2>
+        <p class="text-muted">Upload a .csv file to generate statistics.</p>
+    </div>
+</div>
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow-sm p-4 mb-4">
+            
+            <!-- 
+                DEVELOPER 2: The enctype="multipart/form-data" attribute is strictly required. 
+                Without it, Flask cannot receive the physical .csv file from the browser.
+            -->
+            <form action="/dashboard" method="POST" enctype="multipart/form-data">
+                <div class="input-group">
+                    <input type="file" class="form-control" name="dataset" accept=".csv">
+                    <button class="btn btn-success" type="submit">Upload & Analyze</button>
+                </div>
+            </form>
+
+        </div>
+        <div class="text-center">
+            <!-- 
+                DEVELOPER 4: Later on, you will use Jinja tags here (like {{ mean }}) 
+                to dynamically display the numbers calculated by Developer 1's engine.
+            -->
+            <h5>Statistics and Visualizations will render here.</h5>
+        </div>
+    </div>
+</div>
+{% endblock %}
