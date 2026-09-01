@@ -18,3 +18,6 @@ EXPOSE 5000
 
 #Start the Flask development server
 CMD ["flask", "run", "--host=0.0.0.0"]
+
+#Bind to 0.0.0.0 and dynamically read Koyeb's assigned PORT (defaults to 8000)
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "2", "app:app"]
