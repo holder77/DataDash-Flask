@@ -3,6 +3,8 @@ from flask import Flask, render_template, request
 from flask_sqlalchemy import SQLAlchemy
 from dotenv import load_dotenv
 
+#This is a test message from Josh
+
 # ---------------------------------------------------------
 #SETUP & CONFIGURATION
 # ---------------------------------------------------------
@@ -60,6 +62,7 @@ def dashboard():
     #DEVELOPER 4: Pass the calculated stats from Dev 1 into this render_template function to build charts
     return render_template('dashboard.html')
 
-if __name__ == '__main__':
-    #Runs the local development server on port 5000
-    app.run(debug=True, host='0.0.0.0')
+if __name__ == "__main__":
+    #Runs the local development server on port 8000
+    port = int(os.environ.get("PORT", 8000))
+    app.run(host="0.0.0.0", port=port, debug=False)    
