@@ -2,7 +2,7 @@ import os
 from flask import Flask, render_template, request
 from flask_sqlalchemy import SQLAlchemy
 from dotenv import load_dotenv
-
+# Test comment
 # ---------------------------------------------------------
 #SETUP & CONFIGURATION
 # ---------------------------------------------------------
