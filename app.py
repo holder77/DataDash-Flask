@@ -221,15 +221,6 @@ def dashboard():
             if not b2_url:
                 return "Storage error: Could not connect to cloud bucket", 500
                 
-            #Reset the file stream pointer one last time so Rachel's engine can read it from the very beginning.
-            file.seek(0)
-            
-            #Instantiate Rachel's OOP Dataset class sending in the clean file stream.
-            active_dataset = Dataset(file)
-            
-            #Call generate_report from Rachel's engine and save the output to report_data.
-            report_data = active_dataset.generate_report()
-            
             #TEMPORARY TEST OUTPUT: Return the live B2 URL to the screen to prove the cloud upload worked!
             return f"Success! File safely stored in Backblaze at: {b2_url}"
             
