@@ -332,13 +332,13 @@ def dashboard():
                 user_files = StoredFile.query.filter_by(user_id=session['user_id']).all()
 
             #Reset the file stream pointer so Rachel's engine can read it from the very beginning.
-            file.seek(0)
+            #file.seek(0)
             
             #Instantiate Rachel's OOP Dataset class sending in the clean file stream.
-            active_dataset = Dataset(file)
+            #active_dataset = Dataset(file)
             
             #Call generate_report from Rachel's engine and save the output to report_data.
-            report_data = active_dataset.generate_report()
+            #report_data = active_dataset.generate_report()
             
             #Set report_data string output confirming success and VirusTotal scan validation.
             report_data = f"Success! File scanned clean via VirusTotal and safely stored at: {b2_url}"
