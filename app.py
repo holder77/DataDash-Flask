@@ -1,9 +1,38 @@
-import os
-from flask import Flask, render_template, request
-from flask_sqlalchemy import SQLAlchemy
-from dotenv import load_dotenv
+#DESCRIPTION: This program runs the DataDash interactive data visualization dashboard. 
+#             It handles secure user authentication, sanitizes and verifies uploaded CSV files 
+#             via VirusTotal, uploads safe files to Backblaze B2 cloud storage, and routes 
+#             data to the OOP math engine for statistical analysis.
 
-#This is a test message from Josh 123
+#LIBRARIES
+#import os module to securely pull environment variables like passwords and API keys.
+import os
+
+#import hashlib module to generate SHA-256 hashes of files for malware scanning.
+import hashlib
+
+#import requests module to make external HTTP calls to the VirusTotal API.
+import requests
+
+#import boto3 module to handle S3-compatible cloud storage connections (Backblaze B2).
+import boto3
+
+#from botocore.exceptions import ClientError to handle specific cloud upload failures.
+from botocore.exceptions import ClientError
+
+#from werkzeug.utils import secure_filename to strip dangerous characters from uploaded filenames.
+from werkzeug.utils import secure_filename
+
+#from werkzeug.security import password hashing functions to securely encrypt user passwords.
+from werkzeug.security import generate_password_hash, check_password_hash
+
+#from flask import modules to run the web server, render HTML templates, handle web requests, and flash messages.
+from flask import Flask, render_template, request, flash
+
+#from flask_sqlalchemy import SQLAlchemy to handle all our database operations using Python objects.
+from flask_sqlalchemy import SQLAlchemy
+
+#from dotenv import load_dotenv to force Python to read the hidden .env file on startup.
+from dotenv import load_dotenv
 
 # ---------------------------------------------------------
 #SETUP & CONFIGURATION
