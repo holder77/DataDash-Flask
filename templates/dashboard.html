@@ -1,35 +1,64 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-12 text-center mb-4">
+<div class="row mb-3 align-items-center">
+    <div class="col-md-8">
         <h2>Data Analysis Dashboard</h2>
-        <p class="text-muted">Upload a .csv file to generate statistics.</p>
+        <p class="text-muted">
+            {% if session.get('is_guest') %}
+                Mode: <span class="badge bg-warning text-dark">Guest (Temporary Storage)</span>
+            {% else %}
+                Logged in as: <strong>{{ session.get('username') }}</strong>
+            {% endif %}
+        </p>
+    </div>
+    <div class="col-md-4 text-end">
+        <a href="/logout" class="btn btn-outline-danger btn-sm">Log Out</a>
     </div>
 </div>
+
 <div class="row justify-content-center">
     <div class="col-md-8">
-        <div class="card shadow-sm p-4 mb-4">
-            
-            <!-- 
-                DEVELOPER 2: The enctype="multipart/form-data" attribute is strictly required. 
-                Without it, Flask cannot receive the physical .csv file from the browser.
-            -->
-            <form action="/dashboard" method="POST" enctype="multipart/form-data">
-                <div class="input-group">
-                    <input type="file" class="form-control" name="dataset" accept=".csv">
-                    <button class="btn btn-success" type="submit">Upload & Analyze</button>
-                </div>
-            </form>
+        
+        <!-- Security & File Rules Warning Box -->
+        <div class="alert alert-info shadow-sm" role="alert">
+            <strong>Security Notice:</strong> Only <code>.csv</code> files are permitted (Max size: 5MB). All files are scanned for malware using the VirusTotal API before processing.
+        </div>
 
+        <!-- Upload Form Card -->
+        <div class="card shadow-sm p-4 mb-4">
+            <form action="/dashboard" method="POST" enctype="multipart/form-data">
+                <div class="mb-3">
+                    <label class="form-label"><strong>Upload Dataset (.csv)</strong></label>
+                    <input type="file" class="form-control" name="dataset" accept=".csv" required>
+                </div>
+                <button class="btn btn-success w-100" type="submit">Upload, Scan & Analyze</button>
+            </form>
         </div>
-        <div class="text-center">
-            <!-- 
-                DEVELOPER 4: Later on, you will use Jinja tags here (like {{ mean }}) 
-                to dynamically display the numbers calculated by Developer 1's engine.
-            -->
-            <h5>Statistics and Visualizations will render here.</h5>
+
+        <!-- Persistent Files List (Only visible for logged-in accounts) -->
+        {% if not session.get('is_guest') and user_files %}
+        <div class="card shadow-sm p-4 mb-4">
+            <h4 class="mb-3">Your Saved Datasets</h4>
+            <ul class="list-group">
+                {% for file in user_files %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span>{{ file.filename }}</span>
+                    <a href="{{ file.b2_url }}" target="_blank" class="btn btn-sm btn-outline-primary">View in Cloud</a>
+                </li>
+                {% endfor %}
+            </ul>
         </div>
+        {% endif %}
+
+        <!-- Results Display Area -->
+        {% if stats %}
+        <div class="card shadow-sm p-4 bg-white mb-4">
+            <h4 class="text-success mb-3">Analysis Report & Results</h4>
+            <pre class="bg-light p-3 border rounded">{{ stats }}</pre>
+        </div>
+        {% endif %}
+        
     </div>
 </div>
 {% endblock %}
