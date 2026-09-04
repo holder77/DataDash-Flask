@@ -230,12 +230,24 @@ def dashboard():
             #Call generate_report from Rachel's engine and save the output to report_data.
             report_data = active_dataset.generate_report()
             
+            #TEMPORARY TEST OUTPUT: Return the live B2 URL to the screen to prove the cloud upload worked!
+            return f"Success! File safely stored in Backblaze at: {b2_url}"
+            
         #Else clause if user attempts to upload a non-CSV file.
         else:
             return "Invalid file type. Only CSV allowed.", 400
             
-    #Pass the report_data dictionary into the render_template function to build the charts on the frontend.
-    return render_template('dashboard.html', stats=report_data)
+    #TEMPORARY FRONTEND FOR TESTING:
+    #Return a raw HTML form so we can test the backend before Developer 4 builds the real dashboard.html.
+    return '''
+    <!doctype html>
+    <title>Test CSV Upload</title>
+    <h2>DataDash Test Upload</h2>
+    <form method=post enctype=multipart/form-data>
+      <input type=file name=file>
+      <input type=submit value=Upload>
+    </form>
+    '''
 
 
 #END OF MAIN
