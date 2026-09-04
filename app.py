@@ -34,38 +34,54 @@ from flask_sqlalchemy import SQLAlchemy
 #from dotenv import load_dotenv to force Python to read the hidden .env file on startup.
 from dotenv import load_dotenv
 
-# ---------------------------------------------------------
-#SETUP & CONFIGURATION
-# ---------------------------------------------------------
-#Load environment variables from the .env file (passwords, database URLs)
+#CONSTANTS & CONFIGURATION
+#Call load_dotenv function to pull all hidden variables into the application's environment.
 load_dotenv()
 
+#Initialize the Flask application and save it to the app variable.
 app = Flask(__name__)
 
-#SECRET_KEY is used by Flask to securely sign session cookies
+#Set the SECRET_KEY from the environment to securely sign session cookies for logged-in users.
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'default-dev-key')
 
-#DATABASE_URL tells SQLAlchemy where to save our user accounts
+#Set the SQLALCHEMY_DATABASE_URI to tell the database where to save our user accounts.
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///local_dashboard.db')
+
+#Turn off SQLALCHEMY_TRACK_MODIFICATIONS to save memory and prevent unnecessary overhead.
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+#Restrict maximum upload size to 16MB to prevent Denial of Service (DoS) attacks from massive files.
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024 
+
+#Initialize the SQLAlchemy database object and link it to our Flask app.
 db = SQLAlchemy(app)
 
-# ---------------------------------------------------------
-#DEVELOPER 3: DATABASE MODELS (User Accounts & Auth)
-# ---------------------------------------------------------
-class User(db.Model):
-    """
-    Maps to the 'user' table in the database.
-    Dev 3 will eventually add more columns here and handle password hashing.
-    """
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(150), unique=True, nullable=False)
-    password = db.Column(db.String(150), nullable=False)
 
-#Creates the local SQLite database automatically on startup if it doesn't exist
+#DATABASE MODELS
+#User class that inherits from db.Model to map directly to the 'user' table in the database.
+class User(db.Model):
+    #Declare id column as an Integer and set it as the Primary Key.
+    id = db.Column(db.Integer, primary_key=True)
+    
+    #Declare username column as a String, enforce unique names, and do not allow empty values.
+    username = db.Column(db.String(150), unique=True, nullable=False)
+    
+    #Declare password_hash column as a String to hold the encrypted password data.
+    password_hash = db.Column(db.String(256), nullable=False)
+
+    #set_password function that takes a plaintext password and converts it to a secure hash.
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    #check_password function that compares a user's login attempt against the saved database hash.
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
+
+#Create the local SQLite database automatically on startup if it doesn't already exist.
 with app.app_context():
     db.create_all()
+
 
 # ---------------------------------------------------------
 #DEVELOPER 2: FLASK ROUTES (Traffic Controllers)
