@@ -1,10 +1,10 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="row mb-4 align-items-center">
+<div class="row mb-3 align-items-center">
     <div class="col-md-8">
         <h2>Data Analysis Dashboard</h2>
-        <p class="text-muted mb-0">
+        <p class="text-muted">
             {% if session.get('is_guest') %}
                 Mode: <span class="badge bg-warning text-dark">Guest (Temporary Storage)</span>
             {% else %}
@@ -17,163 +17,45 @@
     </div>
 </div>
 
-<!-- Flash Messages -->
-{% with messages = get_flashed_messages(with_categories=true) %}
-  {% if messages %}
-    <div class="row mb-3">
-        <div class="col-12">
-        {% for category, message in messages %}
-          <div class="alert alert-{{ category }} shadow-sm">{{ message }}</div>
-        {% endfor %}
-        </div>
-    </div>
-  {% endif %}
-{% endwith %}
-
-<!-- Main 2-Column Layout -->
-<div class="row">
-    
-    <!-- LEFT PANE: Controls & File Management (4 Columns Wide) -->
-    <div class="col-lg-4 col-md-5 mb-4">
+<div class="row justify-content-center">
+    <div class="col-md-8">
         
-        <!-- Security Notice -->
-        <div class="alert alert-info shadow-sm small" role="alert">
-            <strong>Security Notice:</strong> Only <code>.csv</code> files are permitted (Max size: 5MB). Scanned via VirusTotal.
+        <!-- Security & File Rules Warning Box -->
+        <div class="alert alert-info shadow-sm" role="alert">
+            <strong>Security Notice:</strong> Only <code>.csv</code> files are permitted (Max size: 5MB). All files are scanned for malware using the VirusTotal API before processing.
         </div>
 
         <!-- Upload Form Card -->
-        <div class="card shadow-sm p-3 mb-4">
+        <div class="card shadow-sm p-4 mb-4">
             <form action="/dashboard" method="POST" enctype="multipart/form-data">
                 <div class="mb-3">
                     <label class="form-label"><strong>Upload Dataset (.csv)</strong></label>
-                    <input type="file" class="form-control form-control-sm" name="dataset" accept=".csv" required>
+                    <input type="file" class="form-control" name="dataset" accept=".csv" required>
                 </div>
-                <button class="btn btn-success btn-sm w-100" type="submit">Upload, Scan & Analyze</button>
+                <button class="btn btn-success w-100" type="submit">Upload, Scan & Analyze</button>
             </form>
         </div>
 
-        <!-- Persistent Files List -->
+        <!-- Persistent Files List (Only visible for logged-in accounts) -->
         {% if not session.get('is_guest') and user_files %}
-        <div class="card shadow-sm p-3">
-            <h5 class="mb-3">Saved Datasets</h5>
-            <ul class="list-group list-group-flush">
+        <div class="card shadow-sm p-4 mb-4">
+            <h4 class="mb-3">Your Saved Datasets</h4>
+            <ul class="list-group">
                 {% for file in user_files %}
-                <li class="list-group-item px-0 d-flex flex-column">
-                    <span class="text-truncate mb-2"><strong>{{ file.filename }}</strong></span>
-                    
-                    <div class="btn-group w-100">
-                        <a href="/dashboard?load_file={{ file.id }}" class="btn btn-sm btn-primary w-100">Analyze</a>
-                        <a href="{{ file.b2_url }}" target="_blank" class="btn btn-sm btn-outline-secondary w-100">Cloud</a>
-                        <form action="/delete/{{ file.id }}" method="POST" class="d-inline w-100" onsubmit="return confirm('Are you sure you want to permanently delete this dataset?');">
-                            <button type="submit" class="btn btn-sm btn-danger w-100" style="border-top-left-radius: 0; border-bottom-left-radius: 0;">Delete</button>
-                        </form>
-                    </div>
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span>{{ file.filename }}</span>
+                    <a href="{{ file.b2_url }}" target="_blank" class="btn btn-sm btn-outline-primary">View in Cloud</a>
                 </li>
                 {% endfor %}
             </ul>
         </div>
         {% endif %}
-    </div>
 
-    <!-- RIGHT PANE: Interactive Inspector (8 Columns Wide) -->
-    <div class="col-lg-8 col-md-7">
-        
+        <!-- Results Display Area -->
         {% if stats %}
-        <!-- Active Analysis View -->
-        <div class="card shadow-sm p-4 bg-white h-100 border-success">
-            <h4 class="text-success mb-4">Interactive Dataset Inspector</h4>
-            
-            <div class="row h-100">
-                <!-- Inner Left: Column Selector -->
-                <div class="col-lg-5 border-end mb-4 mb-lg-0">
-                    <h5 class="mb-3">Select Target Data</h5>
-                    <div class="mb-3">
-                        <label for="columnSelect" class="form-label text-muted small">Available Columns</label>
-                        <select class="form-select border-primary" id="columnSelect">
-                            <option selected>Choose a column to analyze...</option>
-                            <option value="1">Placeholder: Column A</option>
-                            <option value="2">Placeholder: Column B</option>
-                            <option value="3">Placeholder: Column C</option>
-                        </select>
-                    </div>
-                    
-                    <div class="alert alert-light border mt-4 small text-muted">
-                        <strong>System Status:</strong><br>
-                        {{ stats }}
-                    </div>
-                </div>
-
-                <!-- Inner Right: Statistical Output -->
-                <div class="col-lg-7 ps-lg-4">
-                    <h5 class="mb-3">Descriptive Statistics</h5>
-                    
-                    <ul class="list-group list-group-flush shadow-sm rounded mb-3">
-                        <li class="list-group-item d-flex justify-content-between align-items-center bg-light">
-                            Sample Size (N) 
-                            {# Rachel: Replace '--' with your Jinja variables, e.g., {{ data.n }} #}
-                            <span class="badge bg-secondary rounded-pill">--</span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Mean 
-                            <span class="badge bg-primary rounded-pill">--</span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Median 
-                            <span class="badge bg-primary rounded-pill">--</span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Mode 
-                            <span class="badge bg-primary rounded-pill">--</span>
-                        </li>
-                    </ul>
-                    
-                    <ul class="list-group list-group-flush shadow-sm rounded">
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Minimum 
-                            <span class="badge bg-info rounded-pill text-dark">--</span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Maximum 
-                            <span class="badge bg-info rounded-pill text-dark">--</span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Variance (σ²)
-                            <span class="badge bg-warning rounded-pill text-dark">--</span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Std Deviation (σ)
-                            <span class="badge bg-danger rounded-pill">--</span>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-        
-        {% else %}
-<!-- Empty State View -->
-        <div class="card shadow-sm bg-light h-100 d-flex justify-content-center align-items-center" style="border: 2px dashed #dee2e6;">
-            <div class="text-center p-5">
-                
-                <!-- Mascot Animation Styles -->
-                <style>
-                    @keyframes run-bob {
-                        0% { transform: translateY(0px); }
-                        50% { transform: translateY(-10px); }
-                        100% { transform: translateY(0px); }
-                    }
-                    .running-mascot {
-                        animation: run-bob 0.4s infinite ease-in-out;
-                        max-width: 150px;
-                        border-radius: 15px; /* Softens the square edges of the AI image */
-                    }
-                </style>
-
-                <!-- Mascot Image -->
-                <img src="{{ url_for('static', filename='dataman.jpg') }}" alt="Running Server Mascot" class="running-mascot mb-3 shadow-sm">
-                
-                <h5 class="text-muted mb-2">Awaiting Data...</h5>
-                <p class="text-muted small">Select a dataset from the list or upload a new CSV to get the engine running.</p>
-            </div>
+        <div class="card shadow-sm p-4 bg-white mb-4">
+            <h4 class="text-success mb-3">Analysis Report & Results</h4>
+            <pre class="bg-light p-3 border rounded">{{ stats }}</pre>
         </div>
         {% endif %}
         
