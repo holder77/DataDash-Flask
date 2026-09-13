@@ -2,10 +2,16 @@ services:
   web:
     build: .
     ports:
-      - "5000:5000"
+      - "8000:8000"
     volumes:
       - .:/app
     env_file:
       - .env
     environment:
       - FLASK_DEBUG=1
+    command: >
+      sh -c "echo '=====================================================' &&
+             echo '🚀 DATADASH LOCAL CONTAINER IS LIVE & READY FOR TESTING!' &&
+             echo '👉 VIEW THE WEBSITE HERE: http://localhost:8000' &&
+             echo '=====================================================' &&
+             gunicorn --bind 0.0.0.0:8000 --workers 2 app:app"
