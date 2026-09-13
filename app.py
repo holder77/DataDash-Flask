@@ -181,6 +181,54 @@ def upload_to_b2(file_stream, filename):
         print(f"B2 Upload Failed: {e}")
         return None
 
+#delete_from_b2 function that will take the filename and permanently remove it from Backblaze cloud storage.
+def delete_from_b2(filename):
+    
+    #Initialize S3 client using the boto3 library and inject our custom Backblaze credentials.
+    s3 = boto3.client(
+        's3',
+        endpoint_url=os.getenv('B2_ENDPOINT_URL'),
+        aws_access_key_id=os.getenv('B2_KEY_ID'),
+        aws_secret_access_key=os.getenv('B2_APPLICATION_KEY')
+    )
+    
+    #try/catch block to attempt the deletion command on the cloud bucket.
+    try:
+        #Call delete_object sending in the target bucket name and the specific filename (Key) to delete.
+        s3.delete_object(Bucket=os.getenv('B2_BUCKET_NAME'), Key=filename)
+        
+        #Return True if the deletion was successful.
+        return True
+        
+    #Exception handling in the event the deletion fails (e.g., file not found, bad keys).
+    except ClientError as e:
+        print(f"B2 Deletion Failed: {e}")
+        return False
+
+
+#download_from_b2 function that will fetch a saved file from cloud storage to pass to the math engine.
+def download_from_b2(filename):
+    
+    #Initialize S3 client using the boto3 library and inject our custom Backblaze credentials.
+    s3 = boto3.client(
+        's3',
+        endpoint_url=os.getenv('B2_ENDPOINT_URL'),
+        aws_access_key_id=os.getenv('B2_KEY_ID'),
+        aws_secret_access_key=os.getenv('B2_APPLICATION_KEY')
+    )
+    
+    #try/catch block to attempt to retrieve the file object from the cloud bucket.
+    try:
+        #Call get_object sending in the target bucket name and the specific filename (Key) to retrieve.
+        response = s3.get_object(Bucket=os.getenv('B2_BUCKET_NAME'), Key=filename)
+        
+        #Return the raw file stream (Body) so Rachel's OOP Dataset class can read it.
+        return response['Body'] 
+        
+    #Exception handling in the event the download fails.
+    except ClientError as e:
+        print(f"B2 Download Failed: {e}")
+        return None
 
 #RACHEL'S OOP MATH ENGINE
 #Dataset class that will hold the parsed CSV data and calculate statistics.
@@ -256,13 +304,20 @@ def register():
     #Render the register template if accessed via GET.
     return render_template('register.html')
 
-
 #Route for the '/forgot-password' URL to assist users with password recovery via email.
-@app.route('/forgot-password')
+@app.route('/forgot-password', methods=['GET', 'POST'])
 def forgot_password():
-    #Render the forgot password recovery page template.
+    #Process the submitted form if the user made a POST request.
+    if request.method == 'POST':
+        email = request.form.get('email')
+        
+        # NOTE: Actual email sending logic (like SendGrid or SMTP) would go here.
+        # For now, we simulate success to prevent enumerating user emails.
+        flash('If an account exists with that email, a recovery link has been sent.', 'info')
+        return redirect(url_for('home'))
+        
+    #Render the forgot password recovery page template if accessed via GET.
     return render_template('forgot_password.html')
-
 
 #Route for the '/logout' URL that clears user sessions and returns them to the home screen.
 @app.route('/logout')
@@ -270,7 +325,6 @@ def logout():
     #Clear all session data.
     session.clear()
     return redirect(url_for('home'))
-
 
 #Route for the '/dashboard' URL that handles guest sessions, persistent files, security scans, and uploads.
 @app.route('/dashboard', methods=['GET', 'POST'])
@@ -288,10 +342,28 @@ def dashboard():
     #Initialize report_data and user_files as empty containers.
     report_data = None
     user_files = []
+    
+    #Check if the user clicked 'Analyze' on a saved dataset (passed via URL query parameter).
+    active_file_id = request.args.get('load_file')
 
     #If logged in as a registered user, query the database for their saved files.
     if session.get('user_id'):
         user_files = StoredFile.query.filter_by(user_id=session['user_id']).all()
+        
+        #If an active file was selected, fetch it for the inspector view.
+        if active_file_id:
+            target_file = StoredFile.query.filter_by(id=active_file_id, user_id=session['user_id']).first()
+            if target_file:
+                #Fetch the raw stream from B2.
+                file_stream = download_from_b2(target_file.filename)
+                
+                if file_stream:
+                    #RACHEL'S ENGINE (KEEP COMMENTED OUT UNTIL READY):
+                    #active_dataset = Dataset(file_stream)
+                    #report_data = active_dataset.generate_report()
+                    
+                    #UI Placeholder for Wendy:
+                    report_data = f"File '{target_file.filename}' loaded successfully. Math engine integration pending."
 
     #Safety check to process file upload submissions only if the user made a POST request.
     if request.method == 'POST':
@@ -331,15 +403,6 @@ def dashboard():
                 db.session.commit()
                 user_files = StoredFile.query.filter_by(user_id=session['user_id']).all()
 
-            #Reset the file stream pointer so Rachel's engine can read it from the very beginning.
-            #file.seek(0)
-            
-            #Instantiate Rachel's OOP Dataset class sending in the clean file stream.
-            #active_dataset = Dataset(file)
-            
-            #Call generate_report from Rachel's engine and save the output to report_data.
-            #report_data = active_dataset.generate_report()
-            
             #Set report_data string output confirming success and VirusTotal scan validation.
             report_data = f"Success! File scanned clean via VirusTotal and safely stored at: {b2_url}"
             
@@ -350,6 +413,28 @@ def dashboard():
     #Render the dashboard template, passing through stats reports and user file lists.
     return render_template('dashboard.html', stats=report_data, user_files=user_files)
 
+#Route for deleting a user's saved dataset
+@app.route('/delete/<int:file_id>', methods=['POST'])
+def delete_file(file_id):
+    #Verify the user is logged in
+    if not session.get('user_id'):
+        return redirect(url_for('home'))
+
+    #Query the database to find the specific file, ensuring the current user owns it
+    file_record = StoredFile.query.filter_by(id=file_id, user_id=session['user_id']).first()
+    
+    if file_record:
+        #Call our new helper to delete from Backblaze B2
+        delete_from_b2(file_record.filename)
+        
+        #Delete the record from the Neon PostgreSQL database
+        db.session.delete(file_record)
+        db.session.commit()
+        flash(f"Dataset {file_record.filename} successfully deleted.", "success")
+    else:
+        flash("File not found or unauthorized.", "danger")
+        
+    return redirect(url_for('dashboard'))
 
 #END OF MAIN
 if __name__ == "__main__":
