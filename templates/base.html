@@ -4,11 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DataDash</title>
+    
     <!-- DEVELOPER 4: Bootstrap 5 CDN. This single line applies all the clean CSS styling globally. -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+
+    <!-- Links the style sheet to customize the whole website -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+    <!-- This line adds the tab icon -->
+     <link rel="icon" href="{{ url_for('static', filename='dataman.jpg') }}" type="image/jpg">
+    
 </head>
-<body class="bg-light">
+<body >
     <!-- The container keeps everything centered with nice margins on wide screens -->
     <div class="container mt-5">
         <!-- 

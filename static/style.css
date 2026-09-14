@@ -1,0 +1,29 @@
+/* style.css */
+
+:root {
+    --prim-font-color: #45a6f7;
+}
+
+
+body { 
+    background-color: #f8f8f8;
+    color: #58b401;
+    font-family: 'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif;
+}
+
+/* .container {
+    color: #fa0100;
+} */
+
+.card {
+    background-color: #010202;
+    color: var(--prim-font-color);
+}
+
+/* button  */
+.submit-btn {
+    background-color: #58b401;
+    border-color: #7bff00;
+    color: #f8f8f8;
+}
+
