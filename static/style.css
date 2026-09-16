@@ -2,28 +2,38 @@
 
 :root {
     --prim-font-color: #45a6f7;
+    --title-font: "Press Start 2P", system-ui;
+    --body-font: "IBM Plex Sans Arabic", sans-serif;
 }
 
 
 body { 
     background-color: #f8f8f8;
     color: #58b401;
-    font-family: 'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif;
+    font-family: var(--body-font);
+    /* 'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif; */
 }
 
-/* .container {
-    color: #fa0100;
-} */
+h1, .card h3, h2{
+    font-family: var(--title-font);
+}
 
 .card {
     background-color: #010202;
     color: var(--prim-font-color);
 }
 
-/* button  */
+/* buttons */
 .submit-btn {
     background-color: #58b401;
     border-color: #7bff00;
     color: #f8f8f8;
+    font-family: var(--title-font);
+    font-size: 1em;
 }
 
+.guest-btn {
+    font-family: var(--title-font);
+    font-size: .9em;
+    padding: 10px 20px;
+}
