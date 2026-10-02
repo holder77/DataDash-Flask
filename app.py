@@ -16,6 +16,11 @@ import requests
 #import boto3 module to handle S3-compatible cloud storage connections (Backblaze B2).
 import boto3
 
+#Math engine packages
+import csv
+import io
+import statistics
+
 #from botocore.exceptions import ClientError to handle specific cloud upload failures.
 from botocore.exceptions import ClientError
 
@@ -233,18 +238,68 @@ def download_from_b2(filename):
 #RACHEL'S OOP MATH ENGINE
 #Dataset class that will hold the parsed CSV data and calculate statistics.
 class Dataset:
-    
-    #Initialize the dataset object taking the raw file stream as an argument.
     def __init__(self, raw_file_stream):
-        #RACHEL: This is where you will parse the CSV and determine the headers and column types.
-        pass
+        # Convert raw file bytes → string buffer
+        decoded = raw_file_stream.read().decode("utf-8")
+        buffer = io.StringIO(decoded)
 
-    #generate_report function that will execute the math logic across all columns.
+        reader = csv.DictReader(buffer)
+        self.headers = reader.fieldnames
+        self.columns = {h: [] for h in self.headers}
+
+        # Parse rows and infer numeric values
+        for row in reader:
+            for h in self.headers:
+                value = row[h]
+
+                #Convert to float; if not numeric, store None
+                try:
+                    num = float(value)
+                    self.columns[h].append(num)
+                except ValueError:
+                    self.columns[h].append(None)
+
+        # Identify which columns are numeric
+        self.numeric_columns = {
+            h: [v for v in self.columns[h] if isinstance(v, float)]
+            for h in self.headers
+        }
+
     def generate_report(self):
-        #RACHEL: This function should loop through your columns, calculate Mean, Min, Max, Std, 
-        #and Count, and return a dictionary of those stats to pass to the frontend dashboard.
-        return {"status": "Engine not yet implemented"}
+        """
+        Compute: Mean, Min, Max, Std, Count for each numeric column.
+        Returns a dictionary ready for dashboard
+        """
 
+        report = {}
+
+        for col, values in self.numeric_columns.items():
+            if len(values) == 0:
+                report[col] = {
+                    "type": "non-numeric",
+                    "count": 0
+                }
+                continue
+
+            # Compute statistics
+            count = len(values)
+            mean = statistics.mean(values)
+            min_val = min(values)
+            max_val = max(values)
+
+            # Standard deviation requires at least 2 values
+            std = statistics.stdev(values) if count > 1 else 0.0
+
+            report[col] = {
+                "type": "numeric",
+                "count": count,
+                "mean": mean,
+                "min": min_val,
+                "max": max_val,
+                "std": std
+            }
+
+        return report
 
 #FLASK ROUTES
 #Route for the root URL ('/') that serves the front door login page.
@@ -344,7 +399,7 @@ def dashboard():
     user_files = []
     
     #Check if the user clicked 'Analyze' on a saved dataset (passed via URL query parameter).
-    active_file_id = request.args.get('load_file')
+    active_file_id = request.args.get('load_file',type=int)
 
     #If logged in as a registered user, query the database for their saved files.
     if session.get('user_id'):
@@ -359,11 +414,15 @@ def dashboard():
                 
                 if file_stream:
                     #RACHEL'S ENGINE (KEEP COMMENTED OUT UNTIL READY):
-                    #active_dataset = Dataset(file_stream)
-                    #report_data = active_dataset.generate_report()
+                    raw_bytes = file_stream.read()
+                    buffer = io.BytesIO(raw_bytes)
+                    buffer.seek(0)
+                    
+                    active_dataset = Dataset(buffer)
+                    report_data = active_dataset.generate_report()
                     
                     #UI Placeholder for Wendy:
-                    report_data = f"File '{target_file.filename}' loaded successfully. Math engine integration pending."
+                    #report_data = f"File '{target_file.filename}' loaded successfully. Math engine integration pending."
 
     #Safety check to process file upload submissions only if the user made a POST request.
     if request.method == 'POST':
