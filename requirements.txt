@@ -7,3 +7,6 @@ requests
 pandas==2.2.2
 Werkzeug==3.0.3
 gunicorn
+matplotlib
+psycopg
+psycopg-binary

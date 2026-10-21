@@ -1,71 +1,75 @@
 {% extends 'base.html' %}
 
 {% block content %}
+<!-- Custom CSS for the retro bouncing animation -->
+<style>
+    @keyframes pixelBounce {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-15px); }
+    }
+    .bouncing-dude {
+        display: inline-block;
+        animation: pixelBounce 1s infinite;
+        font-size: 50px;
+        text-shadow: 4px 4px 0px #000;
+    }
+</style>
+
 <div class="row mb-4 align-items-center">
-    <div class="col-md-8">
-        <h2>Data Analysis Dashboard</h2>
-        <p class="text-muted mb-0">
+    <div class="col-md-9">
+        <h2 class="pixel-font title-green" style="font-size: 24px;">DataDash Dashboard</h2>
+        <p class="text-dark fw-bold mt-2 mb-0">
             {% if session.get('is_guest') %}
-                Mode: <span class="badge bg-warning text-dark">Guest (Temporary Storage)</span>
+                Status: <span class="badge bg-warning text-dark border border-dark rounded-0 px-2 py-1">Guest Mode (Volatile)</span>
             {% else %}
-                Logged in as: <strong>{{ session.get('username') }}</strong>
+                User: <span class="text-primary">{{ session.get('username') }}</span>
             {% endif %}
         </p>
     </div>
-    <div class="col-md-4 text-end">
-        <a href="/logout" class="btn btn-outline-danger btn-sm">Log Out</a>
+    <div class="col-md-3 text-end">
+        <a href="/logout" class="btn btn-pixel btn-pixel-danger py-2 px-3">Log Out</a>
     </div>
 </div>
 
-<!-- Flash Messages -->
-{% with messages = get_flashed_messages(with_categories=true) %}
-  {% if messages %}
-    <div class="row mb-3">
-        <div class="col-12">
-        {% for category, message in messages %}
-          <div class="alert alert-{{ category }} shadow-sm">{{ message }}</div>
-        {% endfor %}
-        </div>
-    </div>
-  {% endif %}
-{% endwith %}
-
-<!-- Main 2-Column Layout -->
-<div class="row">
-    
-    <!-- LEFT PANE: Controls & File Management (4 Columns Wide) -->
-    <div class="col-lg-4 col-md-5 mb-4">
+<div class="row justify-content-center">
+    <div class="col-lg-10">
         
-        <!-- Security Notice -->
-        <div class="alert alert-info shadow-sm small" role="alert">
-            <strong>Security Notice:</strong> Only <code>.csv</code> files are permitted (Max size: 5MB). Scanned via VirusTotal.
+        <!-- Flash Messages & Security Notice -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category }} border border-dark rounded-0 fw-bold shadow-sm">{{ message }}</div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <div class="alert alert-info border border-dark rounded-0 shadow-sm fw-bold" role="alert">
+            [SECURITY] Only .csv files permitted (Max 5MB). Payloads scanned via VirusTotal API.
         </div>
 
         <!-- Upload Form Card -->
-        <div class="card shadow-sm p-3 mb-4">
-            <form action="/dashboard" method="POST" enctype="multipart/form-data">
-                <div class="mb-3">
-                    <label class="form-label"><strong>Upload Dataset (.csv)</strong></label>
-                    <input type="file" class="form-control form-control-sm" name="dataset" accept=".csv" required>
-                </div>
-                <button class="btn btn-success btn-sm w-100" type="submit">Upload, Scan & Analyze</button>
+        <div class="card dash-card p-4 mb-4">
+            <h4 class="dash-header text-primary">Upload Dataset</h4>
+            <form action="/dashboard" method="POST" enctype="multipart/form-data" class="d-flex gap-3 align-items-center">
+                <input type="file" class="form-control" name="dataset" accept=".csv" required>
+                <button class="btn btn-pixel btn-pixel-green px-4 py-2 text-nowrap" type="submit">Upload & Scan</button>
             </form>
         </div>
 
         <!-- Persistent Files List -->
         {% if not session.get('is_guest') and user_files %}
-        <div class="card shadow-sm p-3">
-            <h5 class="mb-3">Saved Datasets</h5>
-            <ul class="list-group list-group-flush">
+        <div class="card dash-card p-4 mb-4">
+            <h4 class="dash-header">Cloud Storage</h4>
+            <ul class="list-group rounded-0">
                 {% for file in user_files %}
-                <li class="list-group-item px-0 d-flex flex-column">
-                    <span class="text-truncate mb-2"><strong>{{ file.filename }}</strong></span>
-                    
-                    <div class="btn-group w-100">
-                        <a href="/dashboard?load_file={{ file.id }}" class="btn btn-sm btn-primary w-100">Analyze</a>
-                        <a href="{{ file.b2_url }}" target="_blank" class="btn btn-sm btn-outline-secondary w-100">Cloud</a>
-                        <form action="/delete/{{ file.id }}" method="POST" class="d-inline w-100" onsubmit="return confirm('Are you sure you want to permanently delete this dataset?');">
-                            <button type="submit" class="btn btn-sm btn-danger w-100" style="border-top-left-radius: 0; border-bottom-left-radius: 0;">Delete</button>
+                <li class="list-group-item d-flex justify-content-between align-items-center border-dark border-2 mb-2">
+                    <span class="fw-bold">{{ file.filename }}</span>
+                    <div class="d-flex gap-2">
+                        <a href="/dashboard?load_file={{ file.id }}" class="btn btn-pixel btn-pixel-blue py-1 px-2">Analyze</a>
+                        <a href="{{ file.b2_url }}" target="_blank" class="btn btn-pixel btn-pixel-gray py-1 px-2">Download</a>
+                        
+                        <form action="/delete/{{ file.id }}" method="POST" class="d-inline">
+                            <button type="submit" class="btn btn-pixel btn-pixel-danger py-1 px-2">Del</button>
                         </form>
                     </div>
                 </li>
@@ -73,108 +77,88 @@
             </ul>
         </div>
         {% endif %}
-    </div>
 
-    <!-- RIGHT PANE: Interactive Inspector (8 Columns Wide) -->
-    <div class="col-lg-8 col-md-7">
-        
+        <!-- Results Display Area OR Idle Animation -->
         {% if stats %}
-        <!-- Active Analysis View -->
-        <div class="card shadow-sm p-4 bg-white h-100 border-success">
-            <h4 class="text-success mb-4">Interactive Dataset Inspector</h4>
-            
-            <div class="row h-100">
-                <!-- Inner Left: Column Selector -->
-                <div class="col-lg-5 border-end mb-4 mb-lg-0">
-                    <h5 class="mb-3">Select Target Data</h5>
-                    <div class="mb-3">
-                        <label for="columnSelect" class="form-label text-muted small">Available Columns</label>
-                        <select class="form-select border-primary" id="columnSelect">
-                            <option selected>Choose a column to analyze...</option>
-                            <option value="1">Placeholder: Column A</option>
-                            <option value="2">Placeholder: Column B</option>
-                            <option value="3">Placeholder: Column C</option>
-                        </select>
+            <div class="card dash-card p-4 mb-4">
+                <h4 class="dash-header text-success">
+                    Analysis Engine 
+                    {% if active_file %}
+                        <span class="text-secondary fs-6"> - [ {{ active_file }} ]</span>
+                    {% endif %}
+                </h4>
+                
+                <!-- If stats is just a success message string from upload -->
+                {% if stats is string %}
+                    <div class="alert alert-success border border-dark rounded-0 fw-bold">{{ stats }}</div>
+                {% else %}
+                    <!-- If stats is the dictionary from Rachel's math engine, format it as a table -->
+                    <div class="table-responsive">
+                        <table class="table table-hover table-pixel mb-0">
+                            <thead>
+                                <tr>
+                                    <th>COLUMN</th>
+                                    <th>COUNT</th>
+                                    <th>MEAN</th>
+                                    <th>MIN</th>
+                                    <th>MAX</th>
+                                    <th>STD DEV</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for col, data in stats.items() %}
+                                <tr>
+                                    <td><strong>{{ col }}</strong></td>
+                                    
+                                    {% if data.type == 'numeric' %}
+                                        <!-- Print Math Engine numbers -->
+                                        <td>{{ data.count }}</td>
+                                        <td>{{ "%.2f"|format(data.mean) }}</td>
+                                        <td>{{ "%.2f"|format(data.min) }}</td>
+                                        <td>{{ "%.2f"|format(data.max) }}</td>
+                                        <td>{{ "%.2f"|format(data.std) }}</td>
+                                        
+                                    {% elif data.type == 'categorical' %}
+                                        <!-- Print Dynamic Text Engine logic -->
+                                        <td>{{ data.count }}</td>
+                                        <td colspan="4" class="text-muted">
+                                            <span class="badge bg-secondary rounded-0">TEXT</span> 
+                                            &nbsp;<strong>Unique:</strong> {{ data.unique }} 
+                                            &nbsp;|&nbsp; <strong>Mode:</strong> {{ data.mode }}
+                                        </td>
+                                        
+                                    {% else %}
+                                        <!-- Fallback for completely empty columns -->
+                                        <td>0</td>
+                                        <td colspan="4" class="text-muted fst-italic">[EMPTY DATAPOINT]</td>
+                                    {% endif %}
+                                    
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
-                    
-                    <div class="alert alert-light border mt-4 small text-muted">
-                        <strong>System Status:</strong><br>
-                        {{ stats }}
+                {% endif %}
+                
+                <!-- Dynamic Chart Rendering -->
+                {% if charts %}
+                <div class="row mt-5 justify-content-center">
+                    {% for chart in charts %}
+                    <div class="col-md-6 mb-4 text-center">
+                        <img src="data:image/png;base64,{{ chart }}" class="img-fluid border border-3 border-dark shadow-sm" alt="Dataset Visual">
                     </div>
+                    {% endfor %}
                 </div>
-
-                <!-- Inner Right: Statistical Output -->
-                <div class="col-lg-7 ps-lg-4">
-                    <h5 class="mb-3">Descriptive Statistics</h5>
-                    
-                    <ul class="list-group list-group-flush shadow-sm rounded mb-3">
-                        <li class="list-group-item d-flex justify-content-between align-items-center bg-light">
-                            Sample Size (N) 
-                            {# Rachel: Replace '--' with your Jinja variables, e.g., {{ data.n }} #}
-                            <span class="badge bg-secondary rounded-pill">--</span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Mean 
-                            <span class="badge bg-primary rounded-pill">--</span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Median 
-                            <span class="badge bg-primary rounded-pill">--</span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Mode 
-                            <span class="badge bg-primary rounded-pill">--</span>
-                        </li>
-                    </ul>
-                    
-                    <ul class="list-group list-group-flush shadow-sm rounded">
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Minimum 
-                            <span class="badge bg-info rounded-pill text-dark">--</span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Maximum 
-                            <span class="badge bg-info rounded-pill text-dark">--</span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Variance (σ²)
-                            <span class="badge bg-warning rounded-pill text-dark">--</span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Std Deviation (σ)
-                            <span class="badge bg-danger rounded-pill">--</span>
-                        </li>
-                    </ul>
-                </div>
+                {% endif %}
+                
             </div>
-        </div>
-        
         {% else %}
-<!-- Empty State View -->
-        <div class="card shadow-sm bg-light h-100 d-flex justify-content-center align-items-center" style="border: 2px dashed #dee2e6;">
-            <div class="text-center p-5">
-                
-                <!-- Mascot Animation Styles -->
-                <style>
-                    @keyframes run-bob {
-                        0% { transform: translateY(0px); }
-                        50% { transform: translateY(-10px); }
-                        100% { transform: translateY(0px); }
-                    }
-                    .running-mascot {
-                        animation: run-bob 0.4s infinite ease-in-out;
-                        max-width: 150px;
-                        border-radius: 15px; /* Softens the square edges of the AI image */
-                    }
-                </style>
-
-                <!-- Mascot Image -->
-                <img src="{{ url_for('static', filename='dataman.jpg') }}" alt="Running Server Mascot" class="running-mascot mb-3 shadow-sm">
-                
-                <h5 class="text-muted mb-2">Awaiting Data...</h5>
-                <p class="text-muted small">Select a dataset from the list or upload a new CSV to get the engine running.</p>
+            <!-- IDLE ANIMATION STATE -->
+            <div class="card dash-card p-5 mb-4 border-secondary d-flex flex-column align-items-center justify-content-center text-center">
+                <img src="{{ url_for('static', filename='dataman.jpg') }}" class="bouncing-dude mb-4" width="150" style="border-radius: 12px; border: 3px solid #1890ff; box-shadow: 4px 4px 0px #000;" alt="DataMan Logo">
+                <h4 class="pixel-font text-muted mb-3" style="font-size: 16px;">SYSTEM IDLE</h4>
+                <p class="text-secondary fw-bold mb-0">AWAITING TO ANALYZE...</p>
             </div>
-        </div>
         {% endif %}
         
     </div>

@@ -1,46 +1,61 @@
-<!-- DEVELOPER 4: Tells Flask to wrap this specific page inside base.html -->
 {% extends 'base.html' %}
 
-<!-- Everything between here and endblock gets injected into base.html -->
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-6 text-center">
-        <h1 class="mb-4">Welcome to DataDash!</h1>
+<!-- Use flexbox to vertically center everything and split the screen -->
+<div class="row justify-content-center align-items-center" style="min-height: 75vh;">
+    
+    <!-- Left Side: Creative Logo & Branding -->
+    <div class="col-md-5 text-center mb-5 mb-md-0 pe-md-4">
+        <!-- Made the logo much larger and added a neon glow effect behind it -->
+        <img src="{{ url_for('static', filename='dataman.jpg') }}" 
+             class="img-fluid mb-4" 
+             style="max-width: 250px; border-radius: 16px; border: 4px solid #1890ff; box-shadow: 0 0 20px rgba(24, 144, 255, 0.4), 8px 8px 0px #000;" 
+             alt="DataMan Logo">
         
-        <!-- Flash Messages for Login Errors -->
+        <h1 class="pixel-font title-green" style="font-size: 32px; line-height: 1.5;">Welcome to<br>DataDash!</h1>
+        <p class="pixel-font text-secondary mt-3" style="font-size: 10px; letter-spacing: 1px;">INTERACTIVE CSV ANALYZER</p>
+    </div>
+
+    <!-- Right Side: Authentication Forms -->
+    <div class="col-md-6 col-lg-5 ps-md-4">
+        
+        <!-- Flash Messages -->
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}
             {% for category, message in messages %}
-              <div class="alert alert-{{ category }}">{{ message }}</div>
+              <div class="alert alert-{{ category }} border border-dark rounded-0 fw-bold shadow-sm">{{ message }}</div>
             {% endfor %}
           {% endif %}
         {% endwith %}
 
-        <div class="card shadow-sm p-4 mb-3">
-            <h3 class="mb-3">Log In</h3>
-            <!-- Connected to the POST /login route -->
+        <!-- Main Login Card -->
+        <div class="card auth-card p-4 mb-4">
+            <h3 class="pixel-font header-blue text-center mb-4 mt-2" style="font-size: 24px;">Log In</h3>
+            
             <form action="/login" method="POST">
                 <div class="mb-3 text-start">
-                    <label class="form-label">Username</label>
+                    <label class="form-label auth-label">Username</label>
                     <input type="text" class="form-control" name="username" required>
                 </div>
-                <div class="mb-3 text-start">
-                    <label class="form-label">Password</label>
+                <div class="mb-4 text-start">
+                    <label class="form-label auth-label">Password</label>
                     <input type="password" class="form-control" name="password" required>
                 </div>
-                <button type="submit" class="btn btn-primary w-100 mb-2">Log In</button>
+                <button type="submit" class="btn btn-pixel btn-pixel-green w-100 py-3 mb-3">Log In</button>
             </form>
             
-            <div class="d-flex justify-content-between mt-2">
-                <a href="/register" class="text-decoration-none">Create Account</a>
-                <a href="/forgot-password" class="text-decoration-none text-muted">Forgot Password?</a>
+            <div class="d-flex justify-content-between mt-3">
+                <a href="/register" class="auth-link">Create Account</a>
+                <a href="/forgot-password" class="text-secondary fw-bold text-decoration-none">Forgot Password?</a>
             </div>
         </div>
 
-        <div class="card shadow-sm p-3">
-            <p class="text-muted mb-2">Just want to test it out?</p>
-            <a href="/dashboard?mode=guest" class="btn btn-secondary w-100">Continue as Guest (Temporary)</a>
+        <!-- Guest Card -->
+        <div class="card auth-card p-4">
+            <p class="text-secondary text-center fw-bold mb-3">Just want to test it out?</p>
+            <a href="/dashboard?mode=guest" class="btn btn-pixel btn-pixel-gray w-100 py-3">Continue as Guest</a>
         </div>
+
     </div>
 </div>
 {% endblock %}

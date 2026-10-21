@@ -20,6 +20,14 @@ import boto3
 import csv
 import io
 import statistics
+#import Counter to count categorical text occurrences for the pie charts.
+from collections import Counter
+
+#Graph engine packages
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import base64
 
 #from botocore.exceptions import ClientError to handle specific cloud upload failures.
 from botocore.exceptions import ClientError
@@ -155,8 +163,8 @@ def check_virustotal(file_stream):
     #Exception handling in the event the API is down or the network request fails.
     except requests.exceptions.RequestException as e:
         print(f"VirusTotal Check Failed: {e}")
-        #Fail open for local development so the app doesn't crash if we don't have internet.
-        pass 
+        #SECURITY FIX: Fail closed instead of open to ensure malware doesn't bypass scanning if the network drops.
+        return False
         
     #Return True if the file is clean or unknown.
     return True
@@ -236,70 +244,210 @@ def download_from_b2(filename):
         return None
 
 #RACHEL'S OOP MATH ENGINE
-#Dataset class that will hold the parsed CSV data and calculate statistics.
+#Dataset class that will dynamically hold parsed CSV data and calculate statistics.
 class Dataset:
+    #Constructor method that takes the raw binary file stream downloaded from cloud storage.
     def __init__(self, raw_file_stream):
-        # Convert raw file bytes → string buffer
-        decoded = raw_file_stream.read().decode("utf-8")
+        
+        #Decode the binary file stream into a UTF-8 string buffer while replacing non-decodable characters safely.
+        decoded = raw_file_stream.read().decode("utf-8", errors="replace")
+        
+        #Wrap the decoded raw string inside an in-memory StringIO buffer so the csv module can parse it.
         buffer = io.StringIO(decoded)
 
+        #Initialize the DictReader object to parse rows as associative dictionaries using header names.
         reader = csv.DictReader(buffer)
+        
+        #Extract the list of column header strings from the CSV file.
         self.headers = reader.fieldnames
+        
+        #Initialize an empty list container for every parsed column key found in the header row.
         self.columns = {h: [] for h in self.headers}
 
-        # Parse rows and infer numeric values
+        #Iterate row-by-row across the entire CSV dataset to categorize and store column cell values.
         for row in reader:
+            #Iterate across each defined column header in the current data row.
             for h in self.headers:
-                value = row[h]
+                #Extract the cell value and strip leading and trailing whitespace characters.
+                value = row.get(h, "").strip()
 
-                #Convert to float; if not numeric, store None
-                try:
-                    num = float(value)
-                    self.columns[h].append(num)
-                except ValueError:
+                #Verify if the cell contains empty data; if empty, append None to avoid false zeroes.
+                if not value:
                     self.columns[h].append(None)
+                    continue
 
-        # Identify which columns are numeric
-        self.numeric_columns = {
-            h: [v for v in self.columns[h] if isinstance(v, float)]
-            for h in self.headers
-        }
+                #Use a try/except block to attempt numeric parsing while preserving textual values.
+                try:
+                    #Convert cell string to a float for mathematical calculations.
+                    num = float(value)
+                    #Append the converted floating-point number into the corresponding column list.
+                    self.columns[h].append(num)
+                #Catch ValueError exceptions when encountering text strings, dates, or non-numeric tokens.
+                except ValueError:
+                    #Append the original string value directly into the column list for categorical analysis.
+                    self.columns[h].append(value)
 
+    #generate_report function that will compute numeric metrics or categorical counts per column.
     def generate_report(self):
-        """
-        Compute: Mean, Min, Max, Std, Count for each numeric column.
-        Returns a dictionary ready for dashboard
-        """
-
+        
+        #Initialize an empty dictionary container to store summary statistics for every dataset column.
         report = {}
 
-        for col, values in self.numeric_columns.items():
-            if len(values) == 0:
+        #Iterate across each header to compute metric data based on the extracted contents.
+        for col in self.headers:
+            
+            #Filter out None values to ensure calculations only process populated cells.
+            valid_values = [v for v in self.columns[col] if v is not None]
+
+            #Safety check to identify completely empty columns and prevent zero-division calculation crashes.
+            if not valid_values:
+                #Record empty column metrics and assign a count of zero.
                 report[col] = {
-                    "type": "non-numeric",
+                    "type": "empty",
                     "count": 0
                 }
                 continue
 
-            # Compute statistics
-            count = len(values)
-            mean = statistics.mean(values)
-            min_val = min(values)
-            max_val = max(values)
+            #Filter the list of valid cells to extract only floating-point numbers.
+            numeric_values = [v for v in valid_values if isinstance(v, float)]
 
-            # Standard deviation requires at least 2 values
-            std = statistics.stdev(values) if count > 1 else 0.0
+            #Evaluate whether numeric entries represent the strict majority of populated rows in this column.
+            if len(numeric_values) > len(valid_values) / 2:
+                #Calculate the total number of numeric entries available.
+                count = len(numeric_values)
+                #Compute the mathematical average across all numeric entries.
+                mean = statistics.mean(numeric_values)
+                #Identify the minimum numerical value in the column dataset.
+                min_val = min(numeric_values)
+                #Identify the maximum numerical value in the column dataset.
+                max_val = max(numeric_values)
+                #Calculate sample standard deviation if sample size exceeds 1, otherwise default to 0.0.
+                std = statistics.stdev(numeric_values) if count > 1 else 0.0
 
-            report[col] = {
-                "type": "numeric",
-                "count": count,
-                "mean": mean,
-                "min": min_val,
-                "max": max_val,
-                "std": std
-            }
+                #Populate the report dictionary with the computed statistical metrics.
+                report[col] = {
+                    "type": "numeric",
+                    "count": count,
+                    "mean": mean,
+                    "min": min_val,
+                    "max": max_val,
+                    "std": std
+                }
+            #Else branch to handle categorical string columns such as categories, names, or drug classifications.
+            else:
+                #Cast all valid values explicitly to strings to maintain data homogeneity.
+                string_values = [str(v) for v in valid_values]
+                #Generate a set collection of the string values to isolate distinct items.
+                unique_vals = set(string_values)
 
+                #Use a try/except block to safely calculate the mathematical mode.
+                try:
+                    #Compute the most frequently occurring categorical value using the statistics module.
+                    mode_val = statistics.mode(string_values)
+                #Handle multimodal distribution exceptions when several items share equal frequency.
+                except statistics.StatisticsError:
+                    #Set fallback string label when no singular modal value exists.
+                    mode_val = "Multiple"
+
+                #Populate the report dictionary with the computed categorical summary.
+                report[col] = {
+                    "type": "categorical",
+                    "count": len(string_values),
+                    "unique": len(unique_vals),
+                    "mode": mode_val
+                }
+
+        #Return the completed reporting dictionary ready for template rendering.
         return report
+
+#GRAPHICAL IMPLEMENTATION CLASS
+#Liam's upgraded graph engine that generates dynamic histograms and pie charts.
+class DataVisualizer:
+    
+    # Class Definition taking both the raw dataset and the computed report.
+    def __init__(self, dataset, report_data):
+        self.dataset = dataset
+        self.report_data = report_data
+
+    # Generates a dynamic list of up to 4 charts based on column data types.
+    def generate_charts(self, max_charts=4):
+        # Initialize an empty list to hold the base64 encoded image strings.
+        charts = []
+        
+        # Filter out completely empty columns so we don't try to graph nothing.
+        valid_cols = [col for col in self.dataset.headers if self.report_data[col]['type'] != 'empty']
+        
+        # Loop through the valid columns, stopping once we hit the max_charts limit.
+        for col in valid_cols[:max_charts]:
+            # Extract the data type (numeric or categorical) from the report.
+            col_type = self.report_data[col]['type']
+            
+            # Filter out None values from the raw column data.
+            valid_values = [v for v in self.dataset.columns[col] if v is not None]
+            
+            # Generate figure size for the individual chart. Increased size to 6x5 for better readability.
+            fig, ax = plt.subplots(figsize=(6, 5))
+            
+            # If the column is numeric, build a Histogram to show data distribution.
+            if col_type == 'numeric':
+                # Ensure all values passed to the histogram are actually floats.
+                numeric_vals = [v for v in valid_values if isinstance(v, float)]
+                
+                # Plot the histogram with 10 bins.
+                ax.hist(numeric_vals, bins=10, color='#4e73df', edgecolor='black')
+                
+                # Set axis titles and formatting. Increased font sizes for readability.
+                ax.set_title(f"Distribution of {col}", fontsize=14, fontweight='bold', pad=10)
+                ax.set_xlabel(col, fontsize=12)
+                ax.set_ylabel("Frequency", fontsize=12)
+                
+            # If the column is text/categorical, build a Pie Chart to show breakdown.
+            else:
+                # Cast all values to strings.
+                string_vals = [str(v) for v in valid_values]
+                
+                # Count the occurrences of each unique string.
+                counts = Counter(string_vals)
+                
+                # Grab the top 5 most common items to keep the pie chart readable.
+                top_items = counts.most_common(5)
+                labels = [item[0] for item in top_items]
+                sizes = [item[1] for item in top_items]
+                
+                # If there are more than 5 unique items, lump the rest into an 'Other' slice.
+                if len(counts) > 5:
+                    labels.append("Other")
+                    sizes.append(sum(counts.values()) - sum(sizes))
+                    
+                # Plot the pie chart with slightly larger text.
+                ax.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=140, colors=plt.cm.Paired.colors, textprops={'fontsize': 11})
+                
+                # Set title.
+                ax.set_title(f"Breakdown of {col}", fontsize=14, fontweight='bold', pad=10)
+
+            # Adjust sizing so graph isn't cut off.
+            plt.tight_layout()
+
+            # Set file buffer.
+            buffer = io.BytesIO()
+
+            # Save figure to the buffer.
+            plt.savefig(buffer, format='png', bbox_inches='tight')
+
+            # Get buffer iterator to front of buffer space.
+            buffer.seek(0)
+
+            # Encode figure to Base64.
+            plot_url = base64.b64encode(buffer.getvalue()).decode('utf-8')
+
+            # Close the figure to free up memory.
+            plt.close(fig)
+
+            # Append the encoded chart to our list.
+            charts.append(plot_url)
+
+        # Return the list of encoded figures.
+        return charts
 
 #FLASK ROUTES
 #Route for the root URL ('/') that serves the front door login page.
@@ -312,6 +460,13 @@ def home():
 #Route for the '/login' URL that processes login form submissions and starts a persistent session.
 @app.route('/login', methods=['POST'])
 def login():
+    
+    #SECURITY FIX: Basic rate limiting using session variables to prevent brute-force attacks.
+    session['login_attempts'] = session.get('login_attempts', 0) + 1
+    if session['login_attempts'] >= 5:
+        flash('Too many failed login attempts. Please try again later.', 'danger')
+        return redirect(url_for('home'))
+        
     #Pull username and password values from the submitted form data.
     username = request.form.get('username')
     password = request.form.get('password')
@@ -321,6 +476,7 @@ def login():
     
     #Check if the user exists and if their password matches the database hash.
     if user and user.check_password(password):
+        session.pop('login_attempts', None) # Clear failed attempts counter on successful login
         session['user_id'] = user.id
         session['username'] = user.username
         session.pop('is_guest', None) # Clear guest status on successful login
@@ -343,6 +499,11 @@ def register():
         #Check if the username is already taken in the database.
         if User.query.filter_by(username=username).first():
             flash('Username already exists.', 'danger')
+            return redirect(url_for('register'))
+            
+        #SECURITY FIX: Check if the email is already registered to prevent server crash (IntegrityError).
+        if User.query.filter_by(email=email).first():
+            flash('Email is already registered.', 'danger')
             return redirect(url_for('register'))
             
         #Create a new User object and securely hash their password.
@@ -394,9 +555,11 @@ def dashboard():
     if not session.get('user_id') and not session.get('is_guest'):
         return redirect(url_for('home'))
 
-    #Initialize report_data and user_files as empty containers.
+    #Initialize report_data, user_files, chart_list, and active_filename as empty containers.
     report_data = None
     user_files = []
+    chart_list = []
+    active_filename = None
     
     #Check if the user clicked 'Analyze' on a saved dataset (passed via URL query parameter).
     active_file_id = request.args.get('load_file',type=int)
@@ -409,20 +572,24 @@ def dashboard():
         if active_file_id:
             target_file = StoredFile.query.filter_by(id=active_file_id, user_id=session['user_id']).first()
             if target_file:
+                #Save the specific filename to pass to the HTML template display.
+                active_filename = target_file.filename
+                
                 #Fetch the raw stream from B2.
                 file_stream = download_from_b2(target_file.filename)
                 
                 if file_stream:
-                    #RACHEL'S ENGINE (KEEP COMMENTED OUT UNTIL READY):
+                    #RACHEL'S ENGINE
                     raw_bytes = file_stream.read()
                     buffer = io.BytesIO(raw_bytes)
                     buffer.seek(0)
                     
                     active_dataset = Dataset(buffer)
                     report_data = active_dataset.generate_report()
-                    
-                    #UI Placeholder for Wendy:
-                    #report_data = f"File '{target_file.filename}' loaded successfully. Math engine integration pending."
+
+                    # Generate the dynamic charts
+                    visualizer = DataVisualizer(active_dataset, report_data)
+                    chart_list = visualizer.generate_charts(max_charts=4)
 
     #Safety check to process file upload submissions only if the user made a POST request.
     if request.method == 'POST':
@@ -443,6 +610,9 @@ def dashboard():
             
             #Sanitize the filename to prevent directory traversal attacks.
             filename = secure_filename(file.filename)
+            
+            #Set the active filename so the HTML template can display what was just processed.
+            active_filename = filename
             
             #Call check_virustotal function to run malware scanning. If it returns False, block upload.
             if not check_virustotal(file):
@@ -469,8 +639,8 @@ def dashboard():
         else:
             return "Invalid file type. Only CSV allowed.", 400
             
-    #Render the dashboard template, passing through stats reports and user file lists.
-    return render_template('dashboard.html', stats=report_data, user_files=user_files)
+    #Render the dashboard template, passing through stats reports, user file lists, chart visuals, and the active filename.
+    return render_template('dashboard.html', stats=report_data, user_files=user_files, charts=chart_list, active_file=active_filename)
 
 #Route for deleting a user's saved dataset
 @app.route('/delete/<int:file_id>', methods=['POST'])

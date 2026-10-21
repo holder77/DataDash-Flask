@@ -3,18 +3,135 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DataDash</title>
-    <!-- DEVELOPER 4: Bootstrap 5 CDN. This single line applies all the clean CSS styling globally. -->
+    <title>DataDash Dashboard</title>
+    
+    <!-- Bootstrap 5 CDN -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Google Fonts: 8-bit 'Press Start 2P' for headers, 'Inter' for clean readable data -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Press+Start+2P&display=swap" rel="stylesheet">
+    
+    <style>
+        /* GLOBAL STYLES */
+        body { 
+            background-color: #0b0e14; /* Deep retro arcade black */
+            color: #e2e8f0; 
+            font-family: 'Inter', sans-serif; 
+        }
+        
+        /* 8-BIT TYPOGRAPHY */
+        .pixel-font { 
+            font-family: 'Press Start 2P', cursive; 
+            line-height: 1.4;
+        }
+        .title-green { color: #52c41a; text-shadow: 3px 3px 0px #000; }
+        .header-blue { color: #1890ff; }
+        
+        /* AUTHENTICATION CARDS */
+        .auth-card { 
+            background-color: #151a25; 
+            color: #ffffff; 
+            border: 4px solid #1890ff; 
+            border-radius: 0; 
+            box-shadow: 8px 8px 0px #000; 
+        }
+        .auth-label { color: #52c41a; font-weight: 600; font-size: 14px; }
+        .auth-link { color: #1890ff; text-decoration: none; font-weight: 600; }
+        .auth-link:hover { color: #40a9ff; text-decoration: underline; }
+        
+        /* DASHBOARD CARDS */
+        .dash-card {
+            background-color: #151a25;
+            border: 4px solid #1890ff;
+            border-radius: 0;
+            box-shadow: 8px 8px 0px #000;
+            color: #e2e8f0;
+        }
+        .dash-header {
+            font-family: 'Press Start 2P', cursive; 
+            font-size: 14px; 
+            color: #52c41a;
+            border-bottom: 4px solid #1890ff;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+
+        /* 8-BIT BUTTONS */
+        .btn-pixel {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 12px;
+            text-transform: uppercase;
+            border: 3px solid #000;
+            border-radius: 0;
+            box-shadow: 4px 4px 0px #000;
+            transition: all 0.1s ease;
+        }
+        .btn-pixel:active {
+            box-shadow: 0px 0px 0px #000;
+            transform: translate(4px, 4px);
+        }
+        .btn-pixel-green { background-color: #52c41a; color: #fff; }
+        .btn-pixel-green:hover { background-color: #389e0d; color: #fff; }
+        
+        .btn-pixel-blue { background-color: #1890ff; color: #fff; }
+        .btn-pixel-blue:hover { background-color: #096dd9; color: #fff; }
+        
+        .btn-pixel-gray { background-color: #475569; color: #fff; }
+        .btn-pixel-gray:hover { background-color: #334155; color: #fff; }
+
+        .btn-pixel-danger { background-color: #ff4d4f; color: #fff; }
+        .btn-pixel-danger:hover { background-color: #cf1322; color: #fff; }
+
+        /* RETRO FORMS (Terminal Style) */
+        .form-control {
+            background-color: #06080a;
+            color: #52c41a;
+            border: 3px solid #1890ff;
+            border-radius: 0;
+            font-family: 'Inter', sans-serif;
+            padding: 10px;
+        }
+        .form-control:focus {
+            background-color: #06080a;
+            color: #52c41a;
+            border-color: #52c41a;
+            box-shadow: none;
+        }
+
+        /* CLEAN DATA TABLES (Dark Mode Fix) */
+        .table-pixel { border: 3px solid #1890ff; color: #e2e8f0; }
+        .table-pixel thead th {
+            background-color: #1890ff;
+            color: #fff;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 9px;
+            letter-spacing: 1px;
+            border-bottom: none;
+            padding: 15px;
+        }
+        .table-pixel tbody td {
+            vertical-align: middle;
+            border-color: #334155;
+            font-weight: 500;
+            color: #e2e8f0;
+            background-color: #0b0e14 !important; /* Overrides Bootstrap's default white background */
+        }
+        .table-pixel tbody tr:hover td {
+            background-color: #1f2736 !important;
+            color: #fff;
+        }
+
+        /* BOOTSTRAP OVERRIDES */
+        .text-dark { color: #e2e8f0 !important; }
+        .bg-white { background-color: #151a25 !important; }
+        .text-muted { color: #94a3b8 !important; }
+        .list-group-item { background-color: #0b0e14; color: #e2e8f0; border-color: #334155; }
+        .alert-info { background-color: #082747; color: #e2e8f0; border-color: #1890ff; border-width: 3px; }
+        .alert-success { background-color: #0e3012; color: #e2e8f0; border-color: #52c41a; border-width: 3px; }
+    </style>
 </head>
-<body class="bg-light">
-    <!-- The container keeps everything centered with nice margins on wide screens -->
-    <div class="container mt-5">
-        <!-- 
-            DEVELOPER 4: This is Jinja syntax. 
-            Other HTML files will "inject" their specific code right here, 
-            so we don't have to rewrite the <head> or Bootstrap links on every page.
-        -->
+<body>
+    <div class="container mt-5 mb-5">
         {% block content %}{% endblock %}
     </div>
 </body>

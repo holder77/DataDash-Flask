@@ -1,36 +1,36 @@
-{% extends 'base.html' %}
-{% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-6 text-center">
-        <h1 class="mb-4">Create an Account</h1>
+            <h1 class="pixel-font title-green" style="font-size: 28px;">New Player</h1>
+        </div>
         
-        <!-- Flash Messages for Errors/Success -->
+        <!-- Flash Messages -->
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}
             {% for category, message in messages %}
-              <div class="alert alert-{{ category }}">{{ message }}</div>
+              <div class="alert alert-{{ category }} border border-dark rounded-0 fw-bold">{{ message }}</div>
             {% endfor %}
           {% endif %}
         {% endwith %}
 
-        <div class="card shadow-sm p-4">
+        <div class="card auth-card p-4">
+            <h3 class="pixel-font header-blue text-center mb-4 mt-2" style="font-size: 20px;">Register</h3>
+            
             <form action="/register" method="POST">
                 <div class="mb-3 text-start">
-                    <label class="form-label">Username</label>
+                    <label class="form-label auth-label">Username</label>
                     <input type="text" class="form-control" name="username" required>
                 </div>
                 <div class="mb-3 text-start">
-                    <label class="form-label">Email (for password recovery)</label>
+                    <label class="form-label auth-label">Email (for recovery)</label>
                     <input type="email" class="form-control" name="email" required>
                 </div>
-                <div class="mb-3 text-start">
-                    <label class="form-label">Password</label>
+                <div class="mb-4 text-start">
+                    <label class="form-label auth-label">Password</label>
                     <input type="password" class="form-control" name="password" required>
                 </div>
-                <button type="submit" class="btn btn-success w-100 mb-3">Register Account</button>
+                <button type="submit" class="btn btn-pixel btn-pixel-blue w-100 py-3 mb-3">Create Account</button>
             </form>
-            <div>
-                <a href="/" class="text-decoration-none">Already have an account? Log In</a>
+            
+            <div class="text-center mt-2">
+                <a href="/" class="auth-link">Return to Log In</a>
             </div>
         </div>
     </div>

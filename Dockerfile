@@ -13,11 +13,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 #Copy the rest of the application
 COPY . .
 
-#Expose Flask's default port
-EXPOSE 5000
+#SECURITY & ROUTING FIX: Expose port 8000 to correctly match the Gunicorn bind
+EXPOSE 8000
 
-#Start the Flask development server
-CMD ["flask", "run", "--host=0.0.0.0"]
-
-#Bind to 0.0.0.0 and dynamically read Koyeb's assigned PORT (defaults to 8000)
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "2", "app:app"]
+#COMPILATION FIX: Removed the conflicting 'flask run' command.
+#Bind to 0.0.0.0 and dynamically read the assigned cloud PORT (defaults to 8000).
+#Using shell form (no brackets) so the $PORT environment variable evaluates correctly.
+CMD gunicorn --bind 0.0.0.0:${PORT:-8000} --workers 2 app:app
