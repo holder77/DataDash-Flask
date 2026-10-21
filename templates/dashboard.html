@@ -56,6 +56,11 @@
         <div class="card shadow-sm p-4 bg-white mb-4">
             <h4 class="text-success mb-3">Analysis Report & Results</h4>
             <pre class="bg-light p-3 border rounded">{{ stats }}</pre>
+            
+            <!-- Render the base64 chart if it exists -->
+        {% if chart %}
+            <div class="mt-4 text-center">
+            <img src="data:image/png;base64,{{ chart }}" class="img-fluid border rounded shadow-sm" alt="Mean Values Bar Chart">
         </div>
         {% endif %}
         
