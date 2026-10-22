@@ -700,8 +700,8 @@ def dashboard():
             flash(f"Success! File safely scanned and stored in the cloud.", "success")
             
             #GUEST ANALYSIS FIX: Immediately process the buffer through the math engines so guests actually see their results.
-            file_buffer.seek(0)
-            active_dataset = Dataset(file_buffer)
+            new_buffer = io.BytesIO(raw_bytes)
+            active_dataset = Dataset(new_buffer)
             report_data = active_dataset.generate_report()
             visualizer = DataVisualizer(active_dataset, report_data)
             chart_list = visualizer.generate_charts(max_charts=4)
