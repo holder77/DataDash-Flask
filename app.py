@@ -20,6 +20,13 @@ import boto3
 import csv
 import io
 import statistics
+
+#import time to track lockout durations for the rate limiter.
+import time
+
+#import uuid to generate random strings for unique cloud storage filenames.
+import uuid
+
 #import Counter to count categorical text occurrences for the pie charts.
 from collections import Counter
 
@@ -69,6 +76,12 @@ app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
 #Initialize the SQLAlchemy database object and link it to our Flask app.
 db = SQLAlchemy(app)
 
+#SECURITY CONFIGURATION
+#Initialize an in-memory dictionary to track failed login attempts by IP address.
+FAILED_LOGINS = {}
+
+#Define the hard lockout duration in seconds (300 seconds = 5 minutes).
+LOCKOUT_DURATION = 300 
 
 #DATABASE MODELS
 #User class that inherits from db.Model to map directly to the 'user' table in the database.
@@ -150,7 +163,7 @@ def check_virustotal(file_stream):
         #Send GET request to VirusTotal and wait up to 5 seconds for a response.
         response = requests.get(url, headers=headers, timeout=5)
         
-        #Check if the HTTP response code is 200 OK.
+        #Check if the HTTP response code is 200 OK (meaning the file exists in their database).
         if response.status_code == 200:
             
             #Parse the JSON response to pull the specific security vendor statistics.
@@ -159,15 +172,22 @@ def check_virustotal(file_stream):
             #Safety check to see if any vendor flagged the file as malicious. If yes, return False.
             if stats.get("malicious", 0) > 0:
                 return False 
+            
+            #Return True because the file was found and is completely clean.
+            return True
+            
+        #Check if the file is completely unknown to VirusTotal (404 Not Found).
+        elif response.status_code == 404:
+            #Allow the upload to proceed since it is a brand new, unrecognized user dataset.
+            print("VirusTotal: Hash not found. Allowing unknown CSV.")
+            return True
                 
     #Exception handling in the event the API is down or the network request fails.
     except requests.exceptions.RequestException as e:
         print(f"VirusTotal Check Failed: {e}")
-        #SECURITY FIX: Fail closed instead of open to ensure malware doesn't bypass scanning if the network drops.
-        return False
         
-    #Return True if the file is clean or unknown.
-    return True
+    #SECURITY FIX: Strict fail-closed. If the network dies or the API key is bad, block the upload entirely.
+    return False
 
 
 #upload_to_b2 function that will take the file_stream and filename and push it to Backblaze cloud storage.
@@ -431,7 +451,7 @@ class DataVisualizer:
             # Set file buffer.
             buffer = io.BytesIO()
 
-            # Save figure to the buffer.
+            # Save figure to the buffer using bbox_inches to prevent text clipping.
             plt.savefig(buffer, format='png', bbox_inches='tight')
 
             # Get buffer iterator to front of buffer space.
@@ -461,12 +481,26 @@ def home():
 @app.route('/login', methods=['POST'])
 def login():
     
-    #SECURITY FIX: Basic rate limiting using session variables to prevent brute-force attacks.
-    session['login_attempts'] = session.get('login_attempts', 0) + 1
-    if session['login_attempts'] >= 5:
-        flash('Too many failed login attempts. Please try again later.', 'danger')
-        return redirect(url_for('home'))
-        
+    #SECURITY FIX: Isolate the user's remote IP address to track failed authentication attempts.
+    ip = request.remote_addr
+    #Capture the current system time in seconds since the epoch.
+    current_time = time.time()
+    
+    #Check if the user's IP is already recorded in the failed logins dictionary.
+    if ip in FAILED_LOGINS:
+        #Unpack the tuple to retrieve the attempt count and the timestamp of the first failure.
+        attempts, lockout_start = FAILED_LOGINS[ip]
+        #If the user has failed 5 or more times...
+        if attempts >= 5:
+            #Check if the elapsed time is still within the 5-minute lockout window.
+            if current_time - lockout_start < LOCKOUT_DURATION:
+                #Reject the login attempt and flash a warning to the user.
+                flash('Too many failed attempts. Device locked for 5 minutes.', 'danger')
+                return redirect(url_for('home'))
+            else:
+                #If the 5 minutes have passed, remove the IP from the dictionary to reset the tracker.
+                FAILED_LOGINS.pop(ip, None)
+
     #Pull username and password values from the submitted form data.
     username = request.form.get('username')
     password = request.form.get('password')
@@ -476,11 +510,18 @@ def login():
     
     #Check if the user exists and if their password matches the database hash.
     if user and user.check_password(password):
-        session.pop('login_attempts', None) # Clear failed attempts counter on successful login
+        #Clear any failed login history for this IP upon successful authentication.
+        FAILED_LOGINS.pop(ip, None) 
+        #Start the secure user session.
         session['user_id'] = user.id
         session['username'] = user.username
         session.pop('is_guest', None) # Clear guest status on successful login
         return redirect(url_for('dashboard'))
+    
+    #Track the failed attempt if credentials did not match.
+    attempts, _ = FAILED_LOGINS.get(ip, (0, current_time))
+    #Increment the attempt counter and update the dictionary for this IP.
+    FAILED_LOGINS[ip] = (attempts + 1, current_time)
     
     #Flash error message if login credentials fail.
     flash('Invalid username or password.', 'danger')
@@ -492,16 +533,23 @@ def login():
 def register():
     #Process account creation if the user submitted the registration form via POST.
     if request.method == 'POST':
+        #Pull the submitted credentials from the HTTP form.
         username = request.form.get('username')
         email = request.form.get('email')
         password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
         
+        #SECURITY FIX: Verify that the user typed their password correctly twice to prevent accidental lockouts.
+        if password != confirm_password:
+            flash('Passwords do not match.', 'danger')
+            return redirect(url_for('register'))
+            
         #Check if the username is already taken in the database.
         if User.query.filter_by(username=username).first():
             flash('Username already exists.', 'danger')
             return redirect(url_for('register'))
             
-        #SECURITY FIX: Check if the email is already registered to prevent server crash (IntegrityError).
+        #SECURITY FIX: Query database to proactively catch duplicate emails and prevent a fatal IntegrityError crash.
         if User.query.filter_by(email=email).first():
             flash('Email is already registered.', 'danger')
             return redirect(url_for('register'))
@@ -514,6 +562,7 @@ def register():
         db.session.add(new_user)
         db.session.commit()
         
+        #Flash success and route the user back to the login screen.
         flash('Account created successfully! Please log in.', 'success')
         return redirect(url_for('home'))
         
@@ -525,8 +574,6 @@ def register():
 def forgot_password():
     #Process the submitted form if the user made a POST request.
     if request.method == 'POST':
-        email = request.form.get('email')
-        
         # NOTE: Actual email sending logic (like SendGrid or SMTP) would go here.
         # For now, we simulate success to prevent enumerating user emails.
         flash('If an account exists with that email, a recovery link has been sent.', 'info')
@@ -548,6 +595,7 @@ def dashboard():
     
     #Check if the user entered via the guest mode query parameter.
     if request.args.get('mode') == 'guest':
+        #Clear the session and activate the volatile guest mode toggle.
         session.clear()
         session['is_guest'] = True
         
@@ -570,24 +618,27 @@ def dashboard():
         
         #If an active file was selected, fetch it for the inspector view.
         if active_file_id:
+            #Query the specific file ID making sure it actually belongs to the current user.
             target_file = StoredFile.query.filter_by(id=active_file_id, user_id=session['user_id']).first()
             if target_file:
-                #Save the specific filename to pass to the HTML template display.
-                active_filename = target_file.filename
+                #Strip the 8-character UUID off the front so the frontend displays a clean filename to the user.
+                active_filename = target_file.filename.split('_', 1)[-1] if '_' in target_file.filename else target_file.filename
                 
                 #Fetch the raw stream from B2.
                 file_stream = download_from_b2(target_file.filename)
                 
+                #If the cloud download succeeds, pass the data to the math engine.
                 if file_stream:
                     #RACHEL'S ENGINE
                     raw_bytes = file_stream.read()
                     buffer = io.BytesIO(raw_bytes)
                     buffer.seek(0)
                     
+                    #Instantiate the Dataset class and generate the mathematical report dictionary.
                     active_dataset = Dataset(buffer)
                     report_data = active_dataset.generate_report()
 
-                    # Generate the dynamic charts
+                    #Pass the dataset and report into Liam's DataVisualizer to generate the Base64 image strings.
                     visualizer = DataVisualizer(active_dataset, report_data)
                     chart_list = visualizer.generate_charts(max_charts=4)
 
@@ -609,21 +660,26 @@ def dashboard():
         if file and allowed_file(file.filename):
             
             #Sanitize the filename to prevent directory traversal attacks.
-            filename = secure_filename(file.filename)
+            base_filename = secure_filename(file.filename)
             
-            #Set the active filename so the HTML template can display what was just processed.
-            active_filename = filename
+            #STORAGE FIX: Append a random 8-character UUID to the front to guarantee the file never overwrites an existing B2 object.
+            filename = f"{uuid.uuid4().hex[:8]}_{base_filename}"
             
-            #Call check_virustotal function to run malware scanning. If it returns False, block upload.
+            #Set the active filename so the HTML template can cleanly display what was just processed.
+            active_filename = base_filename 
+            
+            #Call check_virustotal function to run malware scanning. If it returns False, block upload entirely.
             if not check_virustotal(file):
-                return "Upload rejected: Malicious file detected by VirusTotal security scan.", 403
+                flash("Upload rejected: Malicious file or unavailable report from VirusTotal.", "danger")
+                return redirect(url_for('dashboard'))
                 
-            #Call upload_to_b2 function to import the sanitized file to Backblaze B2.
+            #Call upload_to_b2 function to import the sanitized, unique file to Backblaze B2.
             b2_url = upload_to_b2(file, filename)
             
             #Safety check to ensure the cloud upload actually worked before proceeding.
             if not b2_url:
-                return "Storage error: Could not connect to cloud bucket", 500
+                flash("Storage error: Could not connect to cloud bucket", "danger")
+                return redirect(url_for('dashboard'))
                 
             #Save file reference to database ONLY if user is logged in (Guest files are temporary and discarded).
             if session.get('user_id'):
@@ -633,11 +689,19 @@ def dashboard():
                 user_files = StoredFile.query.filter_by(user_id=session['user_id']).all()
 
             #Set report_data string output confirming success and VirusTotal scan validation.
-            report_data = f"Success! File scanned clean via VirusTotal and safely stored at: {b2_url}"
+            flash(f"Success! File safely scanned and stored in the cloud.", "success")
+            
+            #GUEST ANALYSIS FIX: Immediately process the newly uploaded file through the math engines so guests actually see their results.
+            file.seek(0)
+            active_dataset = Dataset(file)
+            report_data = active_dataset.generate_report()
+            visualizer = DataVisualizer(active_dataset, report_data)
+            chart_list = visualizer.generate_charts(max_charts=4)
             
         #Else clause if user attempts to upload a non-CSV file.
         else:
-            return "Invalid file type. Only CSV allowed.", 400
+            flash("Invalid file type. Only CSV allowed.", "danger")
+            return redirect(url_for('dashboard'))
             
     #Render the dashboard template, passing through stats reports, user file lists, chart visuals, and the active filename.
     return render_template('dashboard.html', stats=report_data, user_files=user_files, charts=chart_list, active_file=active_filename)
@@ -653,14 +717,20 @@ def delete_file(file_id):
     file_record = StoredFile.query.filter_by(id=file_id, user_id=session['user_id']).first()
     
     if file_record:
-        #Call our new helper to delete from Backblaze B2
-        delete_from_b2(file_record.filename)
-        
-        #Delete the record from the Neon PostgreSQL database
-        db.session.delete(file_record)
-        db.session.commit()
-        flash(f"Dataset {file_record.filename} successfully deleted.", "success")
+        #STORAGE FIX: Attempt to delete the file from the cloud bucket first.
+        if delete_from_b2(file_record.filename):
+            #If cloud deletion succeeds, remove the record from the Neon PostgreSQL database.
+            db.session.delete(file_record)
+            db.session.commit()
+            
+            #Strip the UUID to output a clean success message to the user.
+            clean_name = file_record.filename.split('_', 1)[-1]
+            flash(f"Dataset {clean_name} successfully deleted.", "success")
+        else:
+            #If cloud deletion fails, leave the database record intact to prevent orphaned files in B2.
+            flash("Failed to delete file from cloud storage.", "danger")
     else:
+        #Error if the file ID doesn't exist or belongs to another user.
         flash("File not found or unauthorized.", "danger")
         
     return redirect(url_for('dashboard'))
