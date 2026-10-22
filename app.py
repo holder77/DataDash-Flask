@@ -629,7 +629,7 @@ def dashboard():
                 
                 #If the cloud download succeeds, pass the data to the math engine.
                 if file_stream:
-                    #RACHEL'S ENGINE
+                    #MEMORY BUFFER FIX: Read into BytesIO to avoid Boto3 closing the stream.
                     raw_bytes = file_stream.read()
                     buffer = io.BytesIO(raw_bytes)
                     buffer.seek(0)
@@ -668,13 +668,21 @@ def dashboard():
             #Set the active filename so the HTML template can cleanly display what was just processed.
             active_filename = base_filename 
             
+            #MEMORY BUFFER FIX: Read the uploaded file into an isolated memory buffer immediately. 
+            #This prevents aggressive thread-pooling libraries (like Boto3) from consuming and destroying the raw Flask stream.
+            raw_bytes = file.read()
+            file_buffer = io.BytesIO(raw_bytes)
+            
             #Call check_virustotal function to run malware scanning. If it returns False, block upload entirely.
-            if not check_virustotal(file):
+            if not check_virustotal(file_buffer):
                 flash("Upload rejected: Malicious file or unavailable report from VirusTotal.", "danger")
                 return redirect(url_for('dashboard'))
                 
+            #Reset the indestructible memory buffer back to index 0 before handing it to Boto3.
+            file_buffer.seek(0)
+            
             #Call upload_to_b2 function to import the sanitized, unique file to Backblaze B2.
-            b2_url = upload_to_b2(file, filename)
+            b2_url = upload_to_b2(file_buffer, filename)
             
             #Safety check to ensure the cloud upload actually worked before proceeding.
             if not b2_url:
@@ -691,9 +699,9 @@ def dashboard():
             #Set report_data string output confirming success and VirusTotal scan validation.
             flash(f"Success! File safely scanned and stored in the cloud.", "success")
             
-            #GUEST ANALYSIS FIX: Immediately process the newly uploaded file through the math engines so guests actually see their results.
-            file.seek(0)
-            active_dataset = Dataset(file)
+            #GUEST ANALYSIS FIX: Immediately process the buffer through the math engines so guests actually see their results.
+            file_buffer.seek(0)
+            active_dataset = Dataset(file_buffer)
             report_data = active_dataset.generate_report()
             visualizer = DataVisualizer(active_dataset, report_data)
             chart_list = visualizer.generate_charts(max_charts=4)
